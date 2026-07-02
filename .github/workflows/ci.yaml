@@ -15,12 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          # No go.sum yet (no external dependencies) — nothing for setup-go to key
+          # the cache on. Re-enable (or drop this line, since true is the default)
+          # once a dependency is added and go.sum exists.
+          cache: false
 
       - name: Check formatting (gofmt)
         run: |
