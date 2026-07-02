@@ -1,9 +1,5 @@
 .claude/
-CLAUDE.md
 doc/*
 !doc/api.yaml
 !doc/architecture.md
 
-/data/          # SQLite ファイル置き場（実行時に生成される DB）
-/todoapp        # go build で生成されるバイナリ
-*.out           # go test -coverprofile などのカバレッジ出力
