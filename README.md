@@ -1,9 +1,9 @@
 # todo-app-go
 
-A project that implements a Todo management REST API in Go.
+A Todo management REST API written in Go.
 
 > [!NOTE]
-> This is a repository for learning purposes.
+> 📚 This repository is for learning purposes.
 
 ## Tech Stack
 
