@@ -1,5 +1,4 @@
 .claude/
-doc/*
-!doc/api.yaml
-!doc/architecture.md
+tmp/
+local-doc/
 
