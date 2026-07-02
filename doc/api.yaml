@@ -1,0 +1,521 @@
+openapi: 3.0.3
+
+info:
+  title: Todo App API
+  version: 0.1.0
+  description: |
+    学習用 Todo アプリの REST API 仕様（MVP）。
+  contact:
+    name: futomaru
+  license:
+    name: Unlicensed (学習用途)
+
+servers:
+  - url: http://localhost:8080
+    description: ローカル開発サーバー
+
+tags:
+  - name: todos
+    description: Todo リソースに対する CRUD 操作
+
+paths:
+  /api/v1/todos:
+    get:
+      tags: [todos]
+      operationId: listTodos
+      summary: Todo 一覧取得
+      description: |
+        Todo を全件取得する。`completed` クエリで完了状態によるフィルターが可能。
+        並び順は `id` 昇順（挿入順）。
+      parameters:
+        - name: completed
+          in: query
+          required: false
+          description: |
+            完了状態によるフィルター。未指定なら全件。
+            - `true` : 完了済みのみ
+            - `false`: 未完了のみ
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 取得成功（0 件の場合は空配列）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TodoResponse'
+              examples:
+                two-items:
+                  summary: 2 件取得した例
+                  value:
+                    - id: 1
+                      title: 買い物
+                      description: 牛乳とパン
+                      completed: false
+                      createdAt: '2026-06-02T10:00:00Z'
+                      updatedAt: '2026-06-02T10:00:00Z'
+                    - id: 2
+                      title: 部屋掃除
+                      description: null
+                      completed: true
+                      createdAt: '2026-06-01T08:30:00Z'
+                      updatedAt: '2026-06-02T09:15:00Z'
+                empty:
+                  summary: 0 件の例
+                  value: []
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [todos]
+      operationId: createTodo
+      summary: Todo 新規作成
+      description: |
+        新しい Todo を作成する。`completed` はサーバー側で常に `false` から開始し、リクエストから受け取らない。
+        `createdAt` / `updatedAt` はサーバー側で取得した同一の現在時刻が設定される。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoCreateRequest'
+            examples:
+              with-description:
+                summary: タイトル + 説明を指定
+                value:
+                  title: 買い物
+                  description: 牛乳とパン
+              title-only:
+                summary: タイトルのみ（description 省略）
+                value:
+                  title: 買い物
+      responses:
+        '201':
+          description: 作成成功
+          headers:
+            Location:
+              description: 作成されたリソースの URI
+              schema:
+                type: string
+                example: /api/v1/todos/2
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoResponse'
+              example:
+                id: 2
+                title: 買い物
+                description: 牛乳とパン
+                completed: false
+                createdAt: '2026-06-02T10:00:00Z'
+                updatedAt: '2026-06-02T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [todos]
+      operationId: deleteCompletedTodos
+      summary: 完了済み Todo の一括削除
+      description: |
+        `completed = true` の Todo をすべて削除する（TodoMVC の "Clear completed" 相当）。
+
+        **仕様上のポイント**（詳細は specification.md §5.6 参照）:
+        - マッチ 0 件でも `204` を返す（コレクション削除は空集合操作も成功扱い）。
+        - 単一 `DELETE /api/v1/todos/{id}` が `404` を返すのとは意味論が異なる。
+        - `?completed=false`（未完了の一括削除）は誤操作リスクが高いため意図的に未対応。
+      parameters:
+        - name: completed
+          in: query
+          required: true
+          description: 削除対象のフィルター。本 MVP では `true` のみ受け付ける。
+          schema:
+            type: boolean
+            enum: [true]
+      responses:
+        '204':
+          description: 削除成功（マッチ 0 件でも 204）
+        '400':
+          description: |
+            `completed` が未指定、または `true` 以外の値が指定された場合。
+            エラー内容の分類（未指定 / 不正値）の詳細は specification.md §7.3 の対応表を参照。
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                missing:
+                  summary: completed クエリ未指定
+                  value:
+                    type: about:blank
+                    title: Bad Request
+                    status: 400
+                    detail: "Required parameter 'completed' is not present"
+                    instance: /api/v1/todos
+                invalid:
+                  summary: completed=false など true 以外
+                  value:
+                    type: about:blank
+                    title: Bad Request
+                    status: 400
+                    detail: Validation failed
+                    instance: /api/v1/todos
+                    errors:
+                      - field: completed
+                        message: must be true
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/todos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TodoIdParam'
+
+    get:
+      tags: [todos]
+      operationId: getTodoById
+      summary: Todo 1 件取得
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoResponse'
+              example:
+                id: 1
+                title: 買い物
+                description: 牛乳とパン
+                completed: false
+                createdAt: '2026-06-02T10:00:00Z'
+                updatedAt: '2026-06-02T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/InvalidPathId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags: [todos]
+      operationId: updateTodo
+      summary: Todo 部分更新
+      description: |
+        指定されたフィールドのみを更新する PATCH セマンティクス。
+        - リクエストに含まれない / `null` のフィールドは **更新しない**。
+        - `completed` は「未指定（null）」と「false 指定」を区別する。
+        - `updatedAt` はサーバー側で取得した現在時刻に更新される。
+        - `title` は空文字を許可しない。null は「未指定」を意味する。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoUpdateRequest'
+            examples:
+              toggle-complete:
+                summary: 完了フラグのみトグル
+                value:
+                  completed: true
+              update-title:
+                summary: タイトルのみ更新
+                value:
+                  title: 買い物（更新）
+              update-multiple:
+                summary: 複数フィールド更新
+                value:
+                  title: 買い物（更新）
+                  completed: true
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoResponse'
+              example:
+                id: 1
+                title: 買い物（更新）
+                description: 牛乳とパン
+                completed: true
+                createdAt: '2026-06-02T10:00:00Z'
+                updatedAt: '2026-06-02T11:30:00Z'
+        '400':
+          description: |
+            リクエストボディのバリデーション失敗（文字数・空文字などの制約違反）、
+            または `id` が 1 未満。
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ValidationProblemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [todos]
+      operationId: deleteTodoById
+      summary: Todo 1 件削除
+      description: |
+        指定 `id` の Todo を削除する。存在しない場合は `404` を返す
+        （冪等性より「存在チェック → エラー → 404」という流れを優先する設計判断。
+        specification.md §5.5 参照）。
+      responses:
+        '204':
+          description: 削除成功（ボディなし）
+        '400':
+          $ref: '#/components/responses/InvalidPathId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+
+  parameters:
+    TodoIdParam:
+      name: id
+      in: path
+      required: true
+      description: Todo の主キー
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 1
+
+  schemas:
+
+    TodoResponse:
+      type: object
+      description: |
+        Todo のレスポンス表現。サーバー → クライアント方向の API 境界で使用する。
+        永続化される Todo リソース（specification.md §4.1）と 1:1 で対応する。
+      required:
+        - id
+        - title
+        - completed
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 主キー（サーバー側で採番）
+          example: 1
+        title:
+          type: string
+          maxLength: 255
+          description: タスク名（必須）
+          example: 買い物
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: 詳細説明（省略可）
+          example: 牛乳とパン
+        completed:
+          type: boolean
+          description: 完了フラグ
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: |
+            作成日時。サーバー側の現在時刻で設定される。
+            タイムゾーンオフセット付きの RFC 3339（UTC、`Z` 終端）で表現する。
+          example: '2026-06-02T10:00:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時。作成時は createdAt と同値。
+          example: '2026-06-02T10:00:00Z'
+
+    TodoCreateRequest:
+      type: object
+      description: |
+        Todo 作成リクエスト（POST のリクエストボディ）。
+        `completed` / `createdAt` / `updatedAt` / `id` はサーバー側で決定するため受け取らない。
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: |
+            タスク名。空文字・空白のみ・null はすべて 400 で弾く（最大 255 文字）。
+          example: 買い物
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: |
+            詳細説明。最大 1000 文字。省略 / `null` のいずれも許可（任意項目）。
+          example: 牛乳とパン
+
+    TodoUpdateRequest:
+      type: object
+      description: |
+        Todo 部分更新リクエスト（PATCH のリクエストボディ）。
+        すべてのフィールドが任意。`null` または省略されたフィールドは更新されない。
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          nullable: true
+          description: |
+            タスク名（1〜255 文字）。
+            `null` は「未指定 = 更新しない」を意味する。
+            明示的な空文字 `""` は 400 で弾く（null と空文字を区別する必要があるため、
+            空文字を無条件で拒否するルールは PATCH では使わない）。
+          example: 買い物（更新）
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: |
+            詳細説明（最大 1000 文字）。
+            `null` の解釈は「未指定 = 更新しない」とする
+            （明示的な NULL 化は本 MVP ではサポートしない）。
+          example: 牛乳と卵
+        completed:
+          type: boolean
+          nullable: true
+          description: |
+            完了フラグ。
+            `null`（未指定 = 更新しない）と `false`（明示的に未完了に戻す）を区別する。
+          example: true
+
+    ProblemDetail:
+      type: object
+      description: |
+        RFC 7807 `application/problem+json` 準拠のエラーレスポンス。
+      required:
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          default: about:blank
+          description: 問題の種別を一意に識別する URI。詳細な分類が無い場合は `about:blank`。
+          example: about:blank
+        title:
+          type: string
+          description: 問題の短い人間可読タイトル（HTTP ステータスのデフォルト文言と同等）
+          example: Not Found
+        status:
+          type: integer
+          description: HTTP ステータスコード
+          example: 404
+        detail:
+          type: string
+          description: 個別の事象に関する人間可読な説明
+          example: 'Todo not found: 1'
+        instance:
+          type: string
+          format: uri-reference
+          description: 問題が発生した具体的なリクエストパス
+          example: /api/v1/todos/1
+
+    ValidationProblemDetail:
+      description: |
+        バリデーション失敗時（400 Bad Request）の ProblemDetail 拡張。
+        `errors` フィールドにフィールド単位のバリデーションエラー詳細を付加する。
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetail'
+        - type: object
+          required:
+            - errors
+          properties:
+            errors:
+              type: array
+              description: フィールド単位のバリデーションエラー一覧
+              items:
+                type: object
+                required:
+                  - field
+                  - message
+                properties:
+                  field:
+                    type: string
+                    description: エラー対象のフィールド名
+                    example: title
+                  message:
+                    type: string
+                    description: バリデーションエラーの内容を表す人間可読なメッセージ
+                    example: must not be blank
+
+  responses:
+
+    NotFound:
+      description: 指定された ID のリソースが存在しない
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: 'Todo not found: 1'
+            instance: /api/v1/todos/1
+
+    InvalidPathId:
+      description: |
+        パス変数 `{id}` が 1 未満、または整数として解釈できない場合。
+        service / repository を呼ぶ前に handler の入口で短絡する。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: Validation failed
+            instance: /api/v1/todos/0
+            errors:
+              - field: id
+                message: must be greater than or equal to 1
+
+    ValidationFailed:
+      description: |
+        リクエストボディのバリデーションに失敗した（必須項目の欠落・文字数制限違反など）。
+        `errors` 配列にフィールド単位の詳細が入る。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: Validation failed
+            instance: /api/v1/todos
+            errors:
+              - field: title
+                message: must not be blank
+              - field: description
+                message: size must be between 0 and 1000
+
+    InternalServerError:
+      description: |
+        サーバー内部エラー（DB 障害・予期しない例外など）。
+        内部エラーの詳細はレスポンスに含めず（ログにのみ出力）、`detail` は汎用メッセージを返す。
+        specification.md §7.1 / §12.3（例外捕捉ミドルウェア）を参照。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Internal Server Error
+            status: 500
+            detail: An unexpected error occurred
+            instance: /api/v1/todos
