@@ -1,0 +1,58 @@
+{
+  "name": "todo-app-go",
+
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "todo-app-go server",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+    "source=todo-app-go-mod-cache,target=/go/pkg/mod,type=volume"
+  ],
+
+  "containerEnv": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
+
+  "updateRemoteUserUID": true,
+
+  "postCreateCommand": "sudo chown -R vscode /go/pkg/mod && go mod download",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-ceintl.vscode-language-pack-ja",
+        "donjayamanne.githistory",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.formatTool": "goimports",
+        "go.lintTool": "govet",
+        "[go]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "golang.go",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        }
+      }
+    }
+  },
+
+  "remoteUser": "vscode"
+}
