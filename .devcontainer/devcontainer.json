@@ -27,8 +27,6 @@
     "DISABLE_AUTOUPDATER": "1"
   },
 
-  "updateRemoteUserUID": true,
-
   "postCreateCommand": "sudo chown -R vscode /go/pkg/mod && go mod download",
 
   "customizations": {
@@ -40,7 +38,6 @@
         "anthropic.claude-code"
       ],
       "settings": {
-        "go.useLanguageServer": true,
         "go.formatTool": "goimports",
         "go.lintTool": "govet",
         "[go]": {
