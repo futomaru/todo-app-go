@@ -8,29 +8,14 @@ import (
 	"github.com/futomaru/todo-app-go/internal/model"
 )
 
-// TodoRepository is the concrete database/sql implementation of todo
-// persistence. There is deliberately no interface declared in this file:
-// per this project's coding standard, interfaces are declared by the
-// consumer (internal/service will declare its own TodoRepository interface
-// in STEP 7), not by the implementer.
 type TodoRepository struct {
 	db *sql.DB
 }
 
-// New wires a *sql.DB into a *TodoRepository. Called once, from the
-// composition root (cmd/todoapp/main.go).
-//
-// TODO: return &TodoRepository{db: db}.
 func New(db *sql.DB) *TodoRepository {
-	panic("not implemented")
+	return &TodoRepository{db: db}
 }
 
-// FindAll returns every todo, ordered by id ascending.
-//
-// TODO: SELECT ... FROM todos ORDER BY id, loop rows.Next(), scanTodo each
-// row, check rows.Err() after the loop, and start the result from
-// make([]model.Todo, 0, ...) rather than `var todos []model.Todo` — a nil
-// slice here would eventually leak out as JSON `null` instead of `[]`.
 func (r *TodoRepository) FindAll(ctx context.Context) ([]model.Todo, error) {
 	panic("not implemented")
 }
@@ -91,36 +76,36 @@ func (r *TodoRepository) DeleteCompleted(ctx context.Context) (int64, error) {
 	panic("not implemented")
 }
 
-// scanTodo scans a single row into a model.Todo. The minimal interface
-// (just Scan) lets this be called with either a *sql.Row (QueryRowContext)
-// or a *sql.Rows (QueryContext, one row at a time) without duplicating the
-// column-mapping logic.
-//
-// TODO: Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &createdAt, &updatedAt)
-// into local `id`/`title`/... fields plus two local `string` vars for the
-// time columns (created_at/updated_at are stored as TEXT, not scannable
-// directly into time.Time), then parseTime() each into t.CreatedAt/UpdatedAt.
-// t.Description (*string) can be scanned directly — database/sql handles
-// NULL<->nil for pointer targets, no sql.NullString needed.
-// On any error, return a zero-value model.Todo{} alongside it, never a
-// half-filled struct.
 func scanTodo(s interface{ Scan(dest ...any) error }) (model.Todo, error) {
-	panic("not implemented")
+	var t model.Todo
+	var createdAt, updatedAt string
+
+	err := s.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &createdAt, &updatedAt)
+	if err != nil {
+		return model.Todo{}, err
+	}
+
+	t.CreatedAt, err = parseTime(createdAt)
+	if err != nil {
+		return model.Todo{}, err
+	}
+
+	t.UpdatedAt, err = parseTime(updatedAt)
+	if err != nil {
+		return model.Todo{}, err
+	}
+
+	return t, nil
 }
 
-// formatTime and parseTime are the *only* conversion point between
-// time.Time and the TEXT columns created_at/updated_at in this codebase.
-// modernc.org/sqlite does not auto-restore time.Time from TEXT columns —
-// this pair is this layer's sharpest gotcha; funnel every time value
-// through here rather than formatting/parsing ad hoc at each call site.
-
-// TODO: return t.UTC().Format(time.RFC3339Nano).
 func formatTime(t time.Time) string {
-	panic("not implemented")
+	return t.UTC().Format(time.RFC3339Nano)
 }
 
-// TODO: time.Parse(time.RFC3339Nano, s), then .UTC() the result before
-// returning so callers always get the same Location clock.System() uses.
 func parseTime(s string) (time.Time, error) {
-	panic("not implemented")
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t.UTC(), nil
 }
