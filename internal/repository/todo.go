@@ -16,6 +16,11 @@ func New(db *sql.DB) *TodoRepository {
 	return &TodoRepository{db: db}
 }
 
+// FindAll returns every todo ordered by id ascending.
+//
+// TODO: QueryContext a SELECT ... FROM todos ORDER BY id, then loop
+// rows.Next()/scanTodo, and finally check rows.Err(). Remember to
+// defer rows.Close().
 func (r *TodoRepository) FindAll(ctx context.Context) ([]model.Todo, error) {
 	panic("not implemented")
 }
@@ -40,13 +45,14 @@ func (r *TodoRepository) FindByID(ctx context.Context, id int64) (model.Todo, er
 	panic("not implemented")
 }
 
-// Insert creates a new todo row and returns its generated id.
-//
-// TODO: ExecContext an INSERT with formatTime(t.CreatedAt) and
-// formatTime(t.UpdatedAt) bound as the time columns, then return
-// res.LastInsertId().
 func (r *TodoRepository) Insert(ctx context.Context, t model.Todo) (int64, error) {
-	panic("not implemented")
+	res, err := r.db.ExecContext(ctx,
+		`INSERT INTO todos (title, description, completed, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)`, t.Title, t.Description, t.Completed, formatTime(t.CreatedAt), formatTime(t.UpdatedAt))
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }
 
 // Update overwrites an existing todo's mutable fields.
