@@ -1,4 +1,7 @@
 .claude/
 tmp/
 local-doc/
+/data/
+/todoapp
+*.out
 
